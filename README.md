@@ -11,6 +11,9 @@ to the device directly over HID via IOKit.
 - Lives in the menu bar (`MenuBarExtra`), no Dock icon
 - Turn the light on (red) and off
 - Intensity levels: 10%, 25% (default), 50%, 100%
+- Pomodoro timer (15/20/30/45/50/60 min): the light goes red for the
+  session, green for 10 s when time is up, then off — survives Mac sleep
+  (wall-clock timing)
 - Hot-plug aware: reconnecting the device restores the current state
 - Handles the Kuando keepalive protocol automatically (the device turns
   itself off unless refreshed every few seconds)
@@ -27,7 +30,8 @@ to the device directly over HID via IOKit.
 swift run
 ```
 
-A circle icon appears in the menu bar. The icon fills in while the light is on.
+A circle icon appears in the menu bar. The icon fills in while the light is
+on, and becomes a timer symbol during a Pomodoro session.
 
 ## Build a distributable app bundle
 
