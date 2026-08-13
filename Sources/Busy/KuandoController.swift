@@ -9,6 +9,7 @@ final class KuandoController: ObservableObject {
     @Published private(set) var isOn = false
     @Published private(set) var isConnected = false
     @Published private(set) var deviceName: String?
+    @Published private(set) var pomodoroEndDate: Date?
 
     /// Brightness 0.0-1.0, applied by scaling the RGB values; the device has
     /// no separate brightness control.
@@ -19,11 +20,14 @@ final class KuandoController: ObservableObject {
     }
 
     private static let logger = Logger(subsystem: "io.kadmos.iambusy", category: "hid")
+    private static let completionHold: TimeInterval = 10
 
     private let manager: IOHIDManager
     private var device: IOHIDDevice?
     private var keepAliveTimer: DispatchSourceTimer?
+    private var pomodoroSession = 0
     private var terminationObserver: NSObjectProtocol?
+    private var wakeObserver: NSObjectProtocol?
     private var currentColor: (red: UInt8, green: UInt8, blue: UInt8) = (0, 0, 0)
 
     init() {
@@ -61,12 +65,25 @@ final class KuandoController: ObservableObject {
         ) { [weak self] _ in
             self?.turnOff()
         }
+
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, isOn else { return }
+            sendCurrentColor()
+            startKeepAlive()
+        }
     }
 
     deinit {
         keepAliveTimer?.cancel()
         if let terminationObserver {
             NotificationCenter.default.removeObserver(terminationObserver)
+        }
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
         }
         IOHIDManagerRegisterDeviceMatchingCallback(manager, nil, nil)
         IOHIDManagerRegisterDeviceRemovalCallback(manager, nil, nil)
@@ -75,6 +92,7 @@ final class KuandoController: ObservableObject {
     }
 
     func turnOn(red: UInt8, green: UInt8, blue: UInt8) {
+        cancelPomodoro()
         currentColor = (red, green, blue)
         isOn = true
         sendCurrentColor()
@@ -82,10 +100,36 @@ final class KuandoController: ObservableObject {
     }
 
     func turnOff() {
+        cancelPomodoro()
         stopKeepAlive()
         isOn = false
         currentColor = (0, 0, 0)
         send(Kuando.offPacket())
+    }
+
+    func startPomodoro(minutes: Int) {
+        let duration = TimeInterval(minutes) * 60
+        turnOn(red: 255, green: 0, blue: 0)
+
+        let session = pomodoroSession
+        pomodoroEndDate = Date(timeIntervalSinceNow: duration)
+        // Wall-clock deadlines so the transitions still line up with the
+        // displayed end time after the machine sleeps.
+        DispatchQueue.main.asyncAfter(wallDeadline: .now() + duration) { [weak self] in
+            guard let self, pomodoroSession == session else { return }
+            turnOn(red: 0, green: 255, blue: 0)
+
+            let holdSession = pomodoroSession
+            DispatchQueue.main.asyncAfter(wallDeadline: .now() + Self.completionHold) { [weak self] in
+                guard let self, pomodoroSession == holdSession else { return }
+                turnOff()
+            }
+        }
+    }
+
+    private func cancelPomodoro() {
+        pomodoroSession += 1
+        pomodoroEndDate = nil
     }
 
     private func startKeepAlive() {

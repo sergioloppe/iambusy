@@ -29,6 +29,23 @@ struct BusyApp: App {
                 controller.turnOff()
             }
             .disabled(!controller.isConnected)
+            if let end = controller.pomodoroEndDate {
+                Text("Ends at \(end.formatted(date: .omitted, time: .shortened))")
+                // Not disabled while disconnected: an unplug leaves the
+                // session running, and it still has to be cancellable.
+                Button("Cancel Pomodoro") {
+                    controller.turnOff()
+                }
+            } else {
+                Menu("Pomodoro") {
+                    ForEach([15, 20, 30, 45, 50, 60], id: \.self) { minutes in
+                        Button("\(minutes) minutes") {
+                            controller.startPomodoro(minutes: minutes)
+                        }
+                    }
+                }
+                .disabled(!controller.isConnected)
+            }
             Picker("Intensity", selection: $controller.intensity) {
                 Text("Low (10%)").tag(0.10)
                 Text("Medium (25%)").tag(0.25)
@@ -40,7 +57,9 @@ struct BusyApp: App {
                 NSApp.terminate(nil)
             }
         } label: {
-            Image(systemName: controller.isOn ? "circle.fill" : "circle")
+            Image(systemName: controller.pomodoroEndDate != nil
+                ? "timer"
+                : (controller.isOn ? "circle.fill" : "circle"))
         }
     }
 }
