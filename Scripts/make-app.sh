@@ -63,7 +63,7 @@ PLIST
 plutil -lint "$APP/Contents/Info.plist" > /dev/null
 
 echo "==> Ad-hoc signing (no Developer ID)"
-codesign --force --sign - "$APP"
+codesign --force --options runtime --sign - "$APP"
 
 echo "==> Zipping"
 ZIP="$DIST/$APP_NAME-$VERSION.zip"

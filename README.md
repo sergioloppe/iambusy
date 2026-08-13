@@ -38,9 +38,10 @@ Scripts/make-app.sh [version]   # version defaults to 0.1.0
 Produces `dist/IAmBusy.app` (universal arm64 + x86_64) and
 `dist/IAmBusy-<version>.zip` ready to share.
 
-The bundle is **ad-hoc signed only** (no Developer ID, no notarization), so
-macOS Gatekeeper will block it on first launch on other machines: right-click
-the app → **Open** → **Open** (one time only), or remove the quarantine flag:
+The bundle is **ad-hoc signed only** (no Developer ID, no notarization), with
+the hardened runtime enabled. macOS Gatekeeper still blocks it on first launch
+on other machines: right-click the app → **Open** → **Open** (one time only),
+or remove the quarantine flag:
 
 ```bash
 xattr -d com.apple.quarantine IAmBusy.app

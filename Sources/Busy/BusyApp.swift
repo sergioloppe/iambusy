@@ -37,7 +37,6 @@ struct BusyApp: App {
             }
             Divider()
             Button("Quit") {
-                controller.turnOff()
                 NSApp.terminate(nil)
             }
         } label: {

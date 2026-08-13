@@ -1,5 +1,7 @@
+import AppKit
 import Foundation
 import IOKit.hid
+import os
 
 /// Owns the HID connection to the first attached Kuando Busylight and the
 /// keepalive refresh that the hardware requires while lit.
@@ -16,9 +18,12 @@ final class KuandoController: ObservableObject {
         }
     }
 
+    private static let logger = Logger(subsystem: "io.kadmos.iambusy", category: "hid")
+
     private let manager: IOHIDManager
     private var device: IOHIDDevice?
     private var keepAliveTimer: DispatchSourceTimer?
+    private var terminationObserver: NSObjectProtocol?
     private var currentColor: (red: UInt8, green: UInt8, blue: UInt8) = (0, 0, 0)
 
     init() {
@@ -43,8 +48,30 @@ final class KuandoController: ObservableObject {
                 .deviceRemoved(device)
         }, context)
 
-        IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
-        IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
+        let opened = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        if opened != kIOReturnSuccess {
+            Self.logger.error("IOHIDManagerOpen failed: \(opened, privacy: .public)")
+        }
+
+        terminationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.turnOff()
+        }
+    }
+
+    deinit {
+        keepAliveTimer?.cancel()
+        if let terminationObserver {
+            NotificationCenter.default.removeObserver(terminationObserver)
+        }
+        IOHIDManagerRegisterDeviceMatchingCallback(manager, nil, nil)
+        IOHIDManagerRegisterDeviceRemovalCallback(manager, nil, nil)
+        IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
+        IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
     }
 
     func turnOn(red: UInt8, green: UInt8, blue: UInt8) {
@@ -100,7 +127,7 @@ final class KuandoController: ObservableObject {
     }
 
     private func dimmed(_ value: UInt8) -> UInt8 {
-        UInt8((Double(value) * intensity).rounded())
+        UInt8(max(0, min(Double(value) * intensity, 255)).rounded())
     }
 
     private func deviceRemoved(_ removed: IOHIDDevice) {
