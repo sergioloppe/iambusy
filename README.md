@@ -1,7 +1,8 @@
 # iambusy
 
 A minimal macOS menu bar app for the [Kuando Busylight](https://busylight.com)
-(Alpha and Omega). Turn the light on and off, pick the intensity, done.
+(Alpha and Omega). Turn the light on and off, pick the color and intensity,
+done.
 
 No server, no Python, no dependencies — a single native SwiftUI app that talks
 to the device directly over HID via IOKit.
@@ -9,11 +10,14 @@ to the device directly over HID via IOKit.
 ## Features
 
 - Lives in the menu bar (`MenuBarExtra`), no Dock icon
-- Turn the light on (red) and off
+- Turn the light on and off in your color of choice: red (default), green,
+  yellow, purple, blue, orange
 - Intensity levels: 10%, 25% (default), 50%, 100%
-- Pomodoro timer (15/20/30/45/50/60 min): the light goes red for the
-  session, green for 10 s when time is up, then off — survives Mac sleep
-  (wall-clock timing)
+- Color and intensity choices persist across launches
+- Pomodoro timer (15/20/30/45/50/60 min): the light shows your chosen color
+  for the session with a live remaining-time countdown in the menu, blinks
+  green at full intensity for 10 s when time is up, then turns off — survives
+  Mac sleep (wall-clock timing)
 - Hot-plug aware: reconnecting the device restores the current state
 - Handles the Kuando keepalive protocol automatically (the device turns
   itself off unless refreshed every few seconds)
@@ -60,10 +64,11 @@ xattr -d com.apple.quarantine IAmBusy.app
 swift run Busy --dump
 ```
 
-Prints the raw 64-byte HID packets (on-red, off, keepalive). These are
-byte-identical to the output of
+Prints the raw 64-byte HID packets (on-red, off, keepalive, blink-grn). The
+first three are byte-identical to the output of
 [busylight-core](https://github.com/JnyJny/busylight_core)'s Kuando
-implementation, which this app's protocol layer is ported from.
+implementation, which this app's protocol layer is ported from; the blink
+packet uses duty-cycle fields busylight-core defines but never sets.
 
 ## Supported devices
 
@@ -80,7 +85,9 @@ app only uses step 0, with two opcodes:
 
 - **Jump** — sets the LED color. Channels use the device's internal 0–100
   scale; intensity control is plain RGB scaling (the device has no separate
-  brightness register).
+  brightness register). With the step's duty-cycle bytes set (0.1 s units)
+  the same opcode blinks in hardware — used for the Pomodoro completion
+  flash.
 - **KeepAlive** — the device quiesces unless it hears one before its timeout.
   The app refreshes every 10 s against a 15 s device-side timeout while the
   light is on. This also means the light always turns off within ~15 s of the
@@ -100,7 +107,7 @@ Sources/Busy/
 ## Roadmap
 
 - [x] `.app` bundle packaging script (unsigned)
-- [ ] Full color picker (the protocol layer already takes arbitrary RGB)
+- [x] Color picker (six presets; the protocol layer takes arbitrary RGB)
 - [ ] Launch at login (`SMAppService`)
 - [ ] Signed + notarized releases (Developer ID)
 - [ ] App icon

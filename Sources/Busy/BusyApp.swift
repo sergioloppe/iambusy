@@ -15,14 +15,21 @@ struct BusyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var controller = KuandoController()
 
+    private static let remainingFormatter: DateComponentsFormatter = {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.zeroFormattingBehavior = .dropLeading
+        return formatter
+    }()
+
     var body: some Scene {
         MenuBarExtra {
             Text(controller.isConnected
                 ? (controller.deviceName ?? "Busylight connected")
                 : "No Busylight found")
             Divider()
-            Button("Turn On (Red)") {
-                controller.turnOn(red: 255, green: 0, blue: 0)
+            Button("Turn On (\(controller.color.name))") {
+                controller.turnOn()
             }
             .disabled(!controller.isConnected)
             Button("Turn Off") {
@@ -30,6 +37,10 @@ struct BusyApp: App {
             }
             .disabled(!controller.isConnected)
             if let end = controller.pomodoroEndDate {
+                if let remaining = controller.pomodoroRemaining,
+                   let text = Self.remainingFormatter.string(from: remaining) {
+                    Text("\(text) remaining")
+                }
                 Text("Ends at \(end.formatted(date: .omitted, time: .shortened))")
                 // Not disabled while disconnected: an unplug leaves the
                 // session running, and it still has to be cancellable.
@@ -45,6 +56,11 @@ struct BusyApp: App {
                     }
                 }
                 .disabled(!controller.isConnected)
+            }
+            Picker("Color", selection: $controller.color) {
+                ForEach(BusyColor.allCases, id: \.self) { color in
+                    Text(color.name).tag(color)
+                }
             }
             Picker("Intensity", selection: $controller.intensity) {
                 Text("Low (10%)").tag(0.10)

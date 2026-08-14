@@ -30,6 +30,24 @@ enum Kuando {
         packet(step0: jumpStep(red: red, green: green, blue: blue))
     }
 
+    /// Blinking runs on the device: the step jumps back to itself, so the
+    /// on/off duty cycle repeats until another packet replaces it.
+    static func blinkPacket(
+        red: UInt8,
+        green: UInt8,
+        blue: UInt8,
+        onTenths: UInt8,
+        offTenths: UInt8
+    ) -> [UInt8] {
+        packet(step0: jumpStep(
+            red: red,
+            green: green,
+            blue: blue,
+            onTenths: onTenths,
+            offTenths: offTenths
+        ))
+    }
+
     static func keepAlivePacket() -> [UInt8] {
         packet(step0: keepAliveStep)
     }
@@ -42,12 +60,21 @@ enum Kuando {
     //   opcode[60..63] operand[56..59] repeat[48..55] red[40..47]
     //   green[32..39] blue[24..31] dutyOn[16..23] dutyOff[8..15]
     //   update[7] ringtone[3..6] volume[0..2]
-    private static func jumpStep(red: UInt8, green: UInt8, blue: UInt8) -> UInt64 {
+    /// The duty fields are in 0.1s units and are not on the color scale.
+    private static func jumpStep(
+        red: UInt8,
+        green: UInt8,
+        blue: UInt8,
+        onTenths: UInt8 = 0,
+        offTenths: UInt8 = 0
+    ) -> UInt64 {
         let opcodeJump: UInt64 = 0x1
         return opcodeJump << 60
             | scaled(red) << 40
             | scaled(green) << 32
             | scaled(blue) << 24
+            | UInt64(onTenths) << 16
+            | UInt64(offTenths) << 8
     }
 
     private static var keepAliveStep: UInt64 {
@@ -87,6 +114,7 @@ extension Kuando {
     static func dumpPackets() {
         let dumps: [(String, [UInt8])] = [
             ("on-red   ", jumpPacket(red: 255, green: 0, blue: 0)),
+            ("blink-grn", blinkPacket(red: 0, green: 255, blue: 0, onTenths: 5, offTenths: 5)),
             ("off      ", offPacket()),
             ("keepalive", keepAlivePacket()),
         ]
