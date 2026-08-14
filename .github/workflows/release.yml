@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - name: Validate tag
+        shell: bash
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || { echo "::error::tag must be vMAJOR.MINOR.PATCH"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build app bundle
+        shell: bash
+        run: Scripts/make-app.sh "${GITHUB_REF_NAME#v}"
+
+      # make-app.sh falls back to a native-arch build if the universal one
+      # fails, which would silently ship a single-arch zip.
+      - name: Verify universal binary
+        shell: bash
+        run: |
+          archs="$(lipo -archs dist/IAmBusy.app/Contents/MacOS/Busy)"
+          echo "archs: $archs"
+          for arch in arm64 x86_64; do
+            grep -qw "$arch" <<<"$archs" || { echo "::error::$arch missing from binary"; exit 1; }
+          done
+
+      - name: Create release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" "dist/IAmBusy-$version.zip" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes 'Ad-hoc signed, not notarized: on first launch right-click the app and choose **Open**, or strip the quarantine flag. See the README for details.'

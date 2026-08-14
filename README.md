@@ -42,6 +42,9 @@ Scripts/make-app.sh [version]   # version defaults to 0.1.0
 Produces `dist/IAmBusy.app` (universal arm64 + x86_64) and
 `dist/IAmBusy-<version>.zip` ready to share.
 
+Pushing a `v*` tag builds the same bundle on GitHub Actions and publishes it
+as a release (`.github/workflows/release.yml`).
+
 The bundle is **ad-hoc signed only** (no Developer ID, no notarization), with
 the hardened runtime enabled. macOS Gatekeeper still blocks it on first launch
 on other machines: right-click the app → **Open** → **Open** (one time only),
